@@ -1,16 +1,15 @@
 <script lang="ts">
-  import { models } from '$lib/models';
-  import { plan } from '$lib/fold/engine';
   import { prefs } from '$lib/prefs.svelte';
-  import Stage from '$lib/components/Stage.svelte';
+  import PaperView from '$lib/components/PaperView.svelte';
   import Level from '$lib/components/Level.svelte';
   import Icon from '$lib/components/Icon.svelte';
   import Stamp from '$lib/components/Stamp.svelte';
   import Tools from '$lib/components/Tools.svelte';
 
-  // ordered simple → hard
-  const cards = models.map((m) => ({ model: m, plans: plan(m) }));
-  const doneCount = $derived(models.filter((m) => prefs.isDone(m.slug)).length);
+  let { data } = $props();
+  // ordered simple → hard (by the server load)
+  const cards = $derived(data.cards);
+  const doneCount = $derived(cards.filter((m) => prefs.isDone(m.slug)).length);
 </script>
 
 <svelte:head>
@@ -30,8 +29,8 @@
   </a>
   <div class="right">
     {#if prefs.loaded && doneCount > 0}
-      <span class="progress" aria-label="{doneCount} of {models.length} folded">
-        <Stamp size={24} />{doneCount}/{models.length}
+      <span class="progress" aria-label="{doneCount} of {cards.length} folded">
+        <Stamp size={24} />{doneCount}/{cards.length}
       </span>
     {/if}
     <Tools />
@@ -40,18 +39,18 @@
 
 <main>
   <ol class="gallery">
-    {#each cards as { model, plans }, i (model.slug)}
+    {#each cards as model, i (model.slug)}
       <li style="--tilt:{[-1.4, 1.1, -0.7, 1.5, -1.1][i % 5]}deg; --delay:{i * 70}ms">
         <a href="/m/{model.slug}" class="card" aria-label="{model.name}, difficulty {model.level} of 5">
           <div class="preview" style="view-transition-name: model-{model.slug}">
-            <Stage {plans} mode="finished" label={model.name} />
+            <PaperView frame={model.frame} vb={model.vb} label={model.name} />
           </div>
           <div class="meta">
             <h2>{model.name}</h2>
             <Level level={model.level} size={14} />
           </div>
           <div class="facts" aria-hidden="true">
-            <span><Icon name="steps" />{plans.length}</span>
+            <span><Icon name="steps" />{model.steps}</span>
             <span><Icon name="clock" />{model.minutes}′</span>
           </div>
           {#if prefs.isDone(model.slug)}

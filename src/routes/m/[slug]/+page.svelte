@@ -1,9 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { page } from '$app/state';
-  import { getModel, nextModel } from '$lib/models';
-  import { plan } from '$lib/fold/engine';
-  import { T_SHOW } from '$lib/fold/frame';
+  import { folded, getModel, nextModel } from '$lib/models';
+  import { T_SHOW } from '$lib/paper/render';
   import { prefs } from '$lib/prefs.svelte';
   import { ui } from '$lib/ui.svelte';
   import { crease } from '$lib/sound';
@@ -17,7 +16,8 @@
   let { data } = $props();
 
   const model = $derived(getModel(data.slug)!);
-  const plans = $derived(plan(model));
+  const compiled = $derived(folded(data.slug));
+  const plans = $derived(compiled.steps);
   const next = $derived(nextModel(model.slug));
   const n = $derived(plans.length);
   const done = $derived(prefs.isDone(model.slug));
@@ -177,7 +177,7 @@
 
 <section class="stage-box" style="view-transition-name: model-{model.slug}">
   <Stage
-    {plans}
+    model={compiled}
     mode={phase === 'scrub' ? 'scrub' : phase}
     {pos}
     oncrease={() => prefs.sound && crease()}
@@ -190,7 +190,7 @@
     {#if atEnd}
       Finished: {model.name}.
     {:else}
-      Step {stepIdx + 1} of {n}. {plans[stepIdx].step.alt}
+      Step {stepIdx + 1} of {n}. {plans[stepIdx].text}
     {/if}
   </p>
 </section>
@@ -234,7 +234,7 @@
             onclick={() => go(i)}
             aria-label="Step {i + 1}"
             aria-current={i === stepIdx ? 'step' : undefined}
-            title={p.step.alt}
+            title={p.text}
           ></button>
         </li>
       {/each}

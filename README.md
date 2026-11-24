@@ -1,41 +1,47 @@
-# origami — origa.mi
+# origami: origa.mi
 
-Paper-like, animated origami guides, ordered simple → hard.
+Paper-like, animated origami guides, ordered simple → hard. Every fold is
+computed by a real paper engine: exact lines, angles and layers, with
+before/after states that physically follow from each other.
 
 ## Run
 
 ```bash
 npm install
-npm run dev        # http://localhost:5173
-npm run build      # static site → build/
+npm run dev          # http://localhost:5173
+npm test             # type check + engine/model unit tests + browser tests
+npm run build        # unit tests, then static site → build/ (folds + validates every model)
 ```
 
-Netlify picks up `netlify.toml` (build `npm run build`, publish `build`).
+Netlify picks up `netlify.toml` (build `npm run build`, publish `build`). A model
+with a physically impossible step fails the build.
 
-## Layout
+## The paper engine (`src/lib/paper`)
 
-| Path | What |
+| File | What |
 |---|---|
-| `src/lib/fold/engine.ts` | Flat-fold engine: split faces along a line, reflect, re-stack. Also `flip`, `rotate`, `mark`, `reshape`. |
-| `src/lib/fold/frame.ts` | Turns a step + time into polygons, shading, crease lines and arrows. |
-| `src/lib/components/Stage.svelte` | SVG renderer + timeline + gliding camera. |
-| `src/lib/models/index.ts` | Model data (fish ◸, boat ◸◸, crane ◸◸◸◸). |
-| `src/lib/prefs.svelte.ts` | "Mark completed" + sound setting, stored in `localStorage`. |
-| `src/routes/+page.svelte` | Home: gallery of finished models, simple → hard. |
-| `src/routes/m/[slug]` | Guide: opens finished, unfolds to a blank sheet, then scroll folds one step at a time. |
+| `geom.ts` | Vectors, lines, convex polygons, rigid 3D motions. |
+| `sheet.ts` | Paper state: each face is a region of the flat sheet + an exact placement; overlapping faces are ordered by layer. Creases are wherever faces meet. |
+| `refs.ts` | Precise references: landmarks and the Huzita–Hatori constructions (`through`, `bring(a).to(b)`, `bisect`, `perpendicular`, `throughBringing`, `bringOntoSquareTo`, `atAngle`, `meet`, `along`). |
+| `ops.ts` | Folds: `valley`, `mountain`, `foldUnfold`, `turnOver`, `rotate`, `reverseFold` (inside/outside), `squash`, `petal`, partial folds (`angle`), `shape`, `copies`, `assemble`, `drawEye`, `view`. |
+| `validate.ts` | Rigid faces, no tears, sheet fully covered, layer order (taco–taco / taco–tortilla), Kawasaki and Maekawa at every vertex, landing checks. |
+| `model.ts` | Compiles a model: runs each step, validates, records each face's motion. |
+| `render.ts` | Replays motion in 3D (welding shared paper points), projects through a camera, draws the diagram. |
 
-Paper: side 0 = green (front), side 1 = white (back). Authored faces can take `shade` (0–1) for a static tone.
+Layer selection is physical: you pick paper with `layers: { flap }`, `{ top, at }` or `{ bottom, at }`.
+Everything attached to that paper on the moving side comes along, and for a valley fold anything
+resting on top is carried too.
 
-## Authoring a step
+## Writing a model (`src/lib/models`)
 
 ```ts
-{ op: 'fold', folds: [{ line: [[x1,y1],[x2,y2]], from: [x,y], pick: ['tag'], behind: false }], alt: '…' }
+valley(bring('T').to('B'))                                   // fold in half
+valley(through('O', along('L', 'B', 0.6)), { side: 'L' })    // exact line from landmarks
+squash({ flap: 'L', hinge: through('O', 'B') })
+petal({ flap: 'R', hinge: top, left: kiteL, right: kiteR })
+reverseFold(atAngle(point, 165), { flap: 'B' })
+valley(hinge, { side: 'L', angle: 80, layers: { top: 1, at } })  // stop part-way, in 3D
 ```
 
-`from` is any point on the side that moves. `pick` / `skip` choose layers by tag, and `tag` labels the moved pieces. `unfold: true` folds the paper and then opens it again, which leaves a crease. `alt` is never shown on screen. Screen readers read it, and it appears as a tooltip on the step dots.
-
-## Phase 0 notes
-
-- Simple valley/mountain folds are **computed**.
-- Squash, petal and reverse folds are **authored** `reshape` steps: the old layers swing onto an axis and the new ones swing out. Phase 1 replaces these with computed geometry (Rabbit Ear).
-- Accounts ("Connect with Google") come later. Completion state lives in the browser only.
+Paper: side 0 = green (front), side 1 = white (back). Step text is generated from the operations
+(override with `say(...)`); `names` turns landmark letters into words.
