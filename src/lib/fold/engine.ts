@@ -58,6 +58,8 @@ export type Step =
       to: Face[];
       alt: string;
       repeat?: boolean;
+      /** new faces slide in behind the existing paper */
+      under?: boolean;
     }
   | { op: 'mark'; marks: Mark[]; alt: string };
 
@@ -278,19 +280,21 @@ function planFold(state: PaperState, step: Extract<Step, { op: 'fold' }>): Plan 
 function planReshape(state: PaperState, step: Extract<Step, { op: 'reshape' }>): Plan {
   const L = makeLine(step.axis);
   const leaving = (f: Face) => !step.out || has(f, step.out);
-  const pieces: Piece[] = [
-    ...state.faces.map((f) => ({
-      ...cloneFace(f),
-      motion: leaving(f) ? 0 : -1,
-      phase: leaving(f) ? ('out' as const) : undefined
-    })),
-    ...step.to.map((f) => ({ ...cloneFace(f), motion: 0, phase: 'in' as const }))
-  ];
+  const old: Piece[] = state.faces.map((f) => ({
+    ...cloneFace(f),
+    motion: leaving(f) ? 0 : -1,
+    phase: leaving(f) ? ('out' as const) : undefined
+  }));
+  const incoming: Piece[] = step.to.map((f) => ({ ...cloneFace(f), motion: 0, phase: 'in' as const }));
+  const pieces = step.under ? [...incoming, ...old] : [...old, ...incoming];
+  const kept = state.faces.filter((f) => !leaving(f)).map(cloneFace);
+  const added = step.to.map(cloneFace);
   const after: PaperState = {
-    faces: [...state.faces.filter((f) => !leaving(f)).map(cloneFace), ...step.to.map(cloneFace)],
+    faces: step.under ? [...added, ...kept] : [...kept, ...added],
     marks: state.marks
   };
-  const from = centroid(state.faces.filter(leaving).flatMap((f) => f.pts));
+  const leavers = state.faces.filter(leaving).flatMap((f) => f.pts);
+  const from = centroid(leavers.length ? leavers : state.faces.flatMap((f) => f.pts));
   const to = centroid(step.to.flatMap((f) => f.pts));
   const ext = bbox([...state.faces.flatMap((f) => f.pts), ...step.to.flatMap((f) => f.pts)]);
   const span = Math.max(ext.x1 - ext.x0, ext.y1 - ext.y0) * 0.35;

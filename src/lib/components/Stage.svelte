@@ -166,7 +166,7 @@
     <circle class="eye" cx={m.at[0]} cy={m.at[1]} r={m.r * (vb.w / 260)} />
   {/each}
 
-  {#if frame.overlay.alpha > 0}
+  {#if frame.overlay.alpha > 0 && frame.overlay.draw > 0.02}
     <g class="overlay" style="opacity:{frame.overlay.alpha}" filter="url(#wobble-ink)">
       {@render overlay(true)}
       {@render overlay(false)}

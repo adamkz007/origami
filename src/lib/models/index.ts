@@ -244,8 +244,273 @@ const crane: Model = {
   ]
 };
 
+
+/* ---------------- Penguin · level 3 ---------------- */
+// Square on its corner, white side up. Side folds hinge at the top corner
+// at 28° so a white belly stays visible down the middle.
+const pen = { x: 0.4695 * 160, y: -100 + 0.8829 * 160 }; // a far point on each side line
+const penguin: Model = {
+  slug: 'penguin',
+  name: 'Penguin',
+  level: 3,
+  minutes: 6,
+  start: [face([[0, -100], [100, 0], [0, 100], [-100, 0]], 1, 'sheet')],
+  steps: [
+    {
+      op: 'fold',
+      unfold: true,
+      folds: [{ line: [[0, -100], [0, 100]], from: [-50, 0] }],
+      alt: 'Fold in half left to right, then unfold to leave a center crease.'
+    },
+    {
+      op: 'fold',
+      folds: [
+        { line: [[0, -100], [-pen.x, pen.y]], from: [-90, 0] },
+        { line: [[0, -100], [pen.x, pen.y]], from: [90, 0] }
+      ],
+      alt: 'Fold the left and right corners in from the top point, leaving a white gap down the middle.'
+    },
+    {
+      op: 'fold',
+      folds: [{ line: [[-60, -50], [60, -50]], from: [0, -80], tag: 'head' }],
+      alt: 'Fold the top point down to make the head.'
+    },
+    {
+      op: 'fold',
+      folds: [{ line: [[-30, -12], [30, -12]], from: [0, -4], pick: ['head'] }],
+      alt: 'Fold the tip back up to make the beak.'
+    },
+    {
+      op: 'fold',
+      folds: [{ line: [[-60, 58], [60, 58]], from: [0, 80], behind: true }],
+      alt: 'Fold the bottom point behind so the penguin can stand.'
+    },
+    {
+      op: 'mark',
+      marks: [
+        { kind: 'eye', at: [-11, -36] },
+        { kind: 'eye', at: [11, -36] }
+      ],
+      alt: 'Draw two eyes. Your penguin is done!'
+    }
+  ]
+};
+
+/* ---------------- Butterfly · level 3 ---------------- */
+// Square, x,y ∈ [-100,100], white side up.
+const butterfly: Model = {
+  slug: 'butterfly',
+  name: 'Butterfly',
+  level: 3,
+  minutes: 8,
+  start: [face([[-100, -100], [100, -100], [100, 100], [-100, 100]], 1, 'sheet')],
+  steps: [
+    {
+      op: 'fold',
+      unfold: true,
+      folds: [{ line: [[-100, -100], [100, 100]], from: [-50, 50] }],
+      alt: 'Fold in half along one diagonal, then unfold.'
+    },
+    {
+      op: 'fold',
+      unfold: true,
+      folds: [{ line: [[100, -100], [-100, 100]], from: [50, 50] }],
+      alt: 'Fold along the other diagonal, then unfold.'
+    },
+    {
+      op: 'fold',
+      unfold: true,
+      folds: [{ line: [[-100, 0], [100, 0]], from: [0, -50], behind: true }],
+      alt: 'Turn over, fold in half top to bottom, then unfold.'
+    },
+    {
+      op: 'reshape',
+      axis: [[-100, 0], [100, 0]],
+      to: [
+        face([[0, -50], [-100, 50], [100, 50]], 1, 'bk'),
+        face([[0, -50], [-100, 50], [0, 50]], 0, 'fL'),
+        toned(face([[0, -50], [0, 50], [100, 50]], 0, 'fR'), 0.1)
+      ],
+      alt: 'Collapse along the creases into a triangle: the waterbomb base.'
+    },
+    {
+      op: 'fold',
+      folds: [
+        { line: [[-50, 0], [0, 50]], from: [-90, 45], pick: ['fL'] },
+        { line: [[50, 0], [0, 50]], from: [90, 45], pick: ['fR'] }
+      ],
+      alt: 'Fold the two bottom corners of the top layer up to the top point.'
+    },
+    { op: 'flip', alt: 'Turn the paper over.' },
+    {
+      op: 'fold',
+      folds: [{ line: [[-100, 10], [100, 10]], from: [0, -30], tag: 'tip' }],
+      alt: 'Fold the top point down so it sticks out past the bottom edge.'
+    },
+    {
+      op: 'fold',
+      folds: [{ line: [[-100, 50], [100, 50]], from: [0, 65], pick: ['tip'] }],
+      alt: 'Fold the little tip up over the edge to lock it.'
+    },
+    {
+      op: 'reshape',
+      axis: [[-100, 10], [100, 10]],
+      to: [
+        face([[-4, 6], [-72, 20], [-60, 66], [-6, 26]], 1, 'wing'),
+        toned(face([[4, 6], [72, 20], [60, 66], [6, 26]], 1, 'wing'), 0.12),
+        face([[0, -6], [-90, -60], [-106, 4], [-6, 10]], 0, 'wing'),
+        toned(face([[0, -6], [90, -60], [106, 4], [6, 10]], 0, 'wing'), 0.14),
+        toned(face([[-5, -16], [5, -16], [4, 32], [-4, 32]], 0, 'body'), 0.35)
+      ],
+      alt: 'Fold in half, then open the wings back out and shape them. Your butterfly is done!'
+    }
+  ]
+};
+
+/* ---------------- Lotus · level 5 ---------------- */
+// Blintz (corners to centre) three times, turn over, blintz again,
+// then pull the hidden corners out layer by layer.
+const blintzSquare = (a: number) => [
+  { line: [[-a, 0], [0, -a]] as [Pt, Pt], from: [-a, -a] as Pt },
+  { line: [[a, 0], [0, -a]] as [Pt, Pt], from: [a, -a] as Pt },
+  { line: [[a, 0], [0, a]] as [Pt, Pt], from: [a, a] as Pt },
+  { line: [[-a, 0], [0, a]] as [Pt, Pt], from: [-a, a] as Pt }
+];
+const blintzDiamond = (h: number) => [
+  { line: [[h, -h], [h, h]] as [Pt, Pt], from: [2 * h, 0] as Pt },
+  { line: [[-h, -h], [-h, h]] as [Pt, Pt], from: [-2 * h, 0] as Pt },
+  { line: [[-h, h], [h, h]] as [Pt, Pt], from: [0, 2 * h] as Pt },
+  { line: [[-h, -h], [h, -h]] as [Pt, Pt], from: [0, -2 * h] as Pt }
+];
+/** a kite-shaped petal pointing `deg` (0 = up) from the centre */
+const petalAt = (deg: number, L: number, W: number, side: 0 | 1, shade = 0): Face => {
+  const r = (deg * Math.PI) / 180;
+  const u: Pt = [Math.sin(r), -Math.cos(r)];
+  const p: Pt = [Math.cos(r), Math.sin(r)];
+  const at = (a: number, b: number): Pt => [u[0] * a + p[0] * b, u[1] * a + p[1] * b];
+  return toned(face([at(6, 0), at(L * 0.48, W), at(L, 0), at(L * 0.48, -W)], side, 'petal'), shade);
+};
+const lotus: Model = {
+  slug: 'lotus',
+  name: 'Lotus',
+  level: 5,
+  minutes: 20,
+  start: [face([[-100, -100], [100, -100], [100, 100], [-100, 100]], 1, 'sheet')],
+  steps: [
+    { op: 'fold', folds: blintzSquare(100), alt: 'Fold all four corners to the center.' },
+    { op: 'fold', folds: blintzDiamond(50), alt: 'Fold the four new corners to the center again.' },
+    { op: 'fold', folds: blintzSquare(50), alt: 'And a third time: all four corners to the center.' },
+    { op: 'flip', alt: 'Turn the paper over.' },
+    { op: 'fold', folds: blintzDiamond(25), alt: 'Fold the four corners to the center one last time.' },
+    {
+      op: 'reshape',
+      axis: [[-60, 0], [60, 0]],
+      out: [],
+      under: true,
+      to: [45, 135, 225, 315].map((d) => petalAt(d, 62, 18, 1, 0.08)),
+      alt: 'Hold the center. From behind, pull the first layer of corners out and up into petals.'
+    },
+    {
+      op: 'reshape',
+      axis: [[-80, 0], [80, 0]],
+      out: [],
+      under: true,
+      to: [0, 90, 180, 270].map((d) => petalAt(d, 78, 26, 0, 0.12)),
+      alt: 'Pull out the next layer of corners between the first petals.'
+    },
+    {
+      op: 'reshape',
+      axis: [[-100, 0], [100, 0]],
+      out: [],
+      under: true,
+      repeat: true,
+      to: [45, 135, 225, 315].map((d) => petalAt(d, 104, 34, 0)),
+      alt: 'Pull out the last layer from underneath to make the outer leaves. Your lotus is done!'
+    }
+  ]
+};
+
+/* ---------------- Sonobe cube · level 5 ---------------- */
+// Six identical units lock together into a cube.
+const s3 = 0.866;
+const cs = 62; // cube size
+const sonobe: Model = {
+  slug: 'sonobe',
+  name: 'Sonobe cube',
+  level: 5,
+  minutes: 30,
+  start: [face([[-100, -100], [100, -100], [100, 100], [-100, 100]], 1, 'sheet')],
+  steps: [
+    {
+      op: 'fold',
+      unfold: true,
+      folds: [{ line: [[-100, 0], [100, 0]], from: [0, -50] }],
+      alt: 'Fold in half top to bottom, then unfold.'
+    },
+    {
+      op: 'fold',
+      folds: [
+        { line: [[-100, -50], [100, -50]], from: [0, -80] },
+        { line: [[-100, 50], [100, 50]], from: [0, 80] }
+      ],
+      alt: 'Fold the top and bottom edges to the center crease.'
+    },
+    {
+      op: 'fold',
+      folds: [
+        { line: [[-100, 0], [-50, 50]], from: [-95, 45], tag: 'cL' },
+        { line: [[100, 0], [50, -50]], from: [95, -45], tag: 'cR' }
+      ],
+      alt: 'Fold the bottom-left and top-right corners in to the center line.'
+    },
+    {
+      op: 'reshape',
+      axis: [[-100, 0], [100, 0]],
+      to: [
+        face([[-100, -50], [50, -50], [100, 0], [100, 50], [-50, 50], [-100, 0]], 1, 'base'),
+        face([[-100, -50], [50, -50], [100, 0], [-100, 0]], 0, 'flap'),
+        toned(face([[-100, 0], [100, 0], [100, 50], [-50, 50]], 0, 'flap'), 0.08)
+      ],
+      alt: 'Unfold those corners and tuck them inside the flaps instead.'
+    },
+    { op: 'flip', alt: 'Turn the paper over.' },
+    {
+      op: 'fold',
+      folds: [
+        { line: [[50, -50], [50, 50]], from: [90, 0], tag: 'pR' },
+        { line: [[-50, -50], [-50, 50]], from: [-90, 20], tag: 'pL' }
+      ],
+      alt: 'Fold the two points in to make a square.'
+    },
+    {
+      op: 'fold',
+      folds: [
+        { line: [[50, -50], [50, 50]], from: [25, 0], pick: ['pR'] },
+        { line: [[-50, -50], [-50, 50]], from: [-25, 10], pick: ['pL'] }
+      ],
+      alt: 'Unfold the points. They are the tabs; one unit is done.'
+    },
+    {
+      op: 'reshape',
+      axis: [[-100, 0], [100, 0]],
+      repeat: true,
+      to: [
+        face([[0, -cs], [s3 * cs, -cs / 2], [0, 0]], 0, 'cube'),
+        face([[0, -cs], [0, 0], [-s3 * cs, -cs / 2]], 1, 'cube'),
+        toned(face([[-s3 * cs, -cs / 2], [0, 0], [-s3 * cs, cs / 2]], 1, 'cube'), 0.15),
+        toned(face([[0, 0], [0, cs], [-s3 * cs, cs / 2]], 0, 'cube'), 0.15),
+        toned(face([[0, 0], [s3 * cs, -cs / 2], [0, cs]], 0, 'cube'), 0.28),
+        toned(face([[s3 * cs, -cs / 2], [s3 * cs, cs / 2], [0, cs]], 1, 'cube'), 0.28)
+      ],
+      alt: 'Make six units. Slide each tab into another unit’s pocket until they lock into a cube. Done!'
+    }
+  ]
+};
+
 /** Ordered simple → hard. */
-export const models: Model[] = [fish, boat, crane].sort((a, b) => a.level - b.level);
+export const models: Model[] = [fish, boat, penguin, butterfly, crane, lotus, sonobe].sort(
+  (a, b) => a.level - b.level
+);
 
 export const getModel = (slug: string) => models.find((m) => m.slug === slug);
 
