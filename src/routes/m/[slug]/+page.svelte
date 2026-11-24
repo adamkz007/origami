@@ -1,7 +1,9 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { page } from '$app/state';
   import { getModel, nextModel } from '$lib/models';
   import { plan } from '$lib/fold/engine';
+  import { T_SHOW } from '$lib/fold/frame';
   import { prefs } from '$lib/prefs.svelte';
   import { ui } from '$lib/ui.svelte';
   import { crease } from '$lib/sound';
@@ -17,46 +19,114 @@
   const model = $derived(getModel(data.slug)!);
   const plans = $derived(plan(model));
   const next = $derived(nextModel(model.slug));
-
-  let index = $state(0);
-  let playing = $state(true);
-  const last = $derived(index === plans.length - 1);
+  const n = $derived(plans.length);
   const done = $derived(prefs.isDone(model.slug));
 
-  // reset when navigating between models
-  $effect(() => {
-    void data.slug;
-    index = 0;
-    playing = true;
+  /**
+   * Scroll ↔ fold mapping. `pos` runs 0…n (step index + time in step).
+   * Resting points ("snaps") sit where the next fold's lines and arrow are drawn
+   * but nothing has moved yet, plus one at the very end (finished model).
+   */
+  let stepPx = $state(600);
+  let viewH = $state(800);
+  let scrollY = $state(0);
+  const snaps = $derived([...plans.map((_, i) => i + T_SHOW), n]);
+  const yFor = (p: number) => (p - T_SHOW) * stepPx;
+  const trackH = $derived(yFor(n) + viewH);
+  const scrollPos = $derived(Math.max(0, Math.min(n, T_SHOW + scrollY / stepPx)));
+
+  // intro: finished → rewind to blank → draw the first fold lines
+  let phase = $state<'finished' | 'rewind' | 'scrub'>('finished');
+  let introCap = $state(Infinity);
+  const pos = $derived(Math.min(scrollPos, introCap));
+
+  const k = $derived.by(() => {
+    let best = 0;
+    snaps.forEach((s, i) => {
+      if (Math.abs(s - pos) < Math.abs(snaps[best] - pos)) best = i;
+    });
+    return best;
   });
+  const atEnd = $derived(pos > n - 0.12);
+  const stepIdx = $derived(Math.min(n - 1, k));
 
-  const go = (i: number) => {
-    index = Math.max(0, Math.min(plans.length - 1, i));
-    playing = true;
-  };
-
-  function onkey(e: KeyboardEvent) {
-    if (ui.keyOpen || (e.target as HTMLElement)?.closest('input,textarea')) return;
-    if (e.key === 'ArrowRight') go(index + 1);
-    else if (e.key === 'ArrowLeft') go(index - 1);
-    else if (e.key === ' ') {
-      e.preventDefault();
-      playing = !playing;
+  function startScrub(drawIn: boolean) {
+    phase = 'scrub';
+    if (!drawIn) {
+      introCap = Infinity;
+      return;
     }
+    introCap = 0;
+    const t0 = performance.now();
+    const grow = (now: number) => {
+      introCap = ((now - t0) / 650) * T_SHOW;
+      if (introCap < T_SHOW) requestAnimationFrame(grow);
+      else introCap = Infinity;
+    };
+    requestAnimationFrame(grow);
   }
 
-  // swipe between steps
-  let sx = 0;
-  let sy = 0;
-  const down = (e: PointerEvent) => {
-    sx = e.clientX;
-    sy = e.clientY;
+  function measure() {
+    viewH = window.innerHeight;
+    stepPx = Math.round(Math.max(320, viewH * 0.7));
+  }
+
+  const go = (i: number) => {
+    const s = snaps[Math.max(0, Math.min(snaps.length - 1, i))];
+    if (phase !== 'scrub') startScrub(false);
+    window.scrollTo({ top: yFor(s), behavior: ui.reducedMotion ? 'auto' : 'smooth' });
   };
-  const up = (e: PointerEvent) => {
-    const dx = e.clientX - sx;
-    const dy = e.clientY - sy;
-    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.4) go(index + (dx < 0 ? 1 : -1));
-  };
+
+  onMount(() => {
+    measure();
+    const html = document.documentElement;
+    html.classList.add('snap');
+    const onScroll = () => {
+      scrollY = window.scrollY;
+      if (phase !== 'scrub' && scrollY > 4) startScrub(false);
+    };
+    onScroll();
+    // one wheel / trackpad gesture = one step (touch + keys use native snapping)
+    let wheelLock = false;
+    let quiet: ReturnType<typeof setTimeout> | undefined;
+    const onWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || ui.keyOpen || Math.abs(e.deltaY) < Math.abs(e.deltaX)) return;
+      e.preventDefault();
+      clearTimeout(quiet);
+      quiet = setTimeout(() => (wheelLock = false), 220);
+      if (wheelLock || Math.abs(e.deltaY) < 4) return;
+      wheelLock = true;
+      go(k + (e.deltaY > 0 ? 1 : -1));
+    };
+    window.addEventListener('wheel', onWheel, { passive: false });
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', measure);
+
+    // arriving mid-page (back/forward) or reduced motion: skip the intro
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    if (window.scrollY > 4 || ui.reducedMotion) startScrub(false);
+    else timer = setTimeout(() => phase === 'finished' && (phase = 'rewind'), 650);
+
+    return () => {
+      clearTimeout(timer);
+      clearTimeout(quiet);
+      window.removeEventListener('wheel', onWheel);
+      html.classList.remove('snap');
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', measure);
+    };
+  });
+
+  function onkey(e: KeyboardEvent) {
+    if (ui.keyOpen) return;
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      go(k + 1);
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      go(k - 1);
+    }
+  }
 
   const share = () => shareModel(model.name, `${page.url.origin}/m/${model.slug}`);
   const toggleDone = () => {
@@ -69,58 +139,70 @@
 
 <svelte:head>
   <title>{model.name} · origa.mi</title>
-  <meta name="description" content="Fold a {model.name.toLowerCase()} in {plans.length} animated steps." />
+  <meta name="description" content="Fold a {model.name.toLowerCase()} in {n} animated steps." />
   <meta property="og:title" content="{model.name} · origa.mi" />
-  <meta property="og:description" content="Fold a {model.name.toLowerCase()} in {plans.length} animated steps." />
+  <meta property="og:description" content="Fold a {model.name.toLowerCase()} in {n} animated steps." />
 </svelte:head>
 
-<div class="screen">
-  <header>
-    <a href="/" class="icon-btn" aria-label="All models"><Icon name="back" /></a>
-    <div class="title">
-      <h1>{model.name}</h1>
-      <Level level={model.level} size={14} />
-    </div>
-    <div class="actions">
-      <button class="icon-btn" onclick={share} aria-label="Share this guide" title="share">
-        <Icon name="share" />
-      </button>
-      <button
-        class="icon-btn mark"
-        class:on={done}
-        onclick={toggleDone}
-        aria-pressed={done}
-        aria-label={done ? 'Completed — tap to undo' : 'Mark completed'}
-        title={done ? 'completed' : 'mark completed'}
-      >
-        <Icon name="stamp" />
-      </button>
-      <Tools />
-    </div>
-  </header>
+<!-- the scroll track: one snap point per step -->
+<div class="track" style="height:{trackH}px" aria-hidden="true">
+  {#each snaps as s}
+    <span class="snap-pt" style="top:{yFor(s)}px"></span>
+  {/each}
+</div>
 
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <section class="stage-wrap" onpointerdown={down} onpointerup={up}>
-    <div class="stage-box">
-      <Stage
-        {plans}
-        bind:index
-        {playing}
-        still={ui.reducedMotion}
-        oncrease={() => prefs.sound && crease()}
-      />
-      {#if done && last}
-        <span class="done-stamp"><Stamp size={86} /></span>
-      {/if}
-    </div>
-    <p class="sr-only" aria-live="polite">Step {index + 1} of {plans.length}. {plans[index].step.alt}</p>
-  </section>
-
-  <div class="step-no" aria-hidden="true">
-    <span class="n">{index + 1}</span><span class="of">/{plans.length}</span>
+<header>
+  <a href="/" class="icon-btn" aria-label="All models"><Icon name="back" /></a>
+  <div class="title">
+    <h1>{model.name}</h1>
+    <Level level={model.level} size={14} />
   </div>
+  <div class="actions">
+    <button class="icon-btn" onclick={share} aria-label="Share this guide" title="share">
+      <Icon name="share" />
+    </button>
+    <button
+      class="icon-btn mark"
+      class:on={done}
+      onclick={toggleDone}
+      aria-pressed={done}
+      aria-label={done ? 'Completed — tap to undo' : 'Mark completed'}
+      title={done ? 'completed' : 'mark completed'}
+    >
+      <Icon name="stamp" />
+    </button>
+    <Tools />
+  </div>
+</header>
 
-  {#if last}
+<section class="stage-box" style="view-transition-name: model-{model.slug}">
+  <Stage
+    {plans}
+    mode={phase === 'scrub' ? 'scrub' : phase}
+    {pos}
+    oncrease={() => prefs.sound && crease()}
+    onrewound={() => startScrub(true)}
+  />
+  {#if done && atEnd}
+    <span class="done-stamp"><Stamp size={86} /></span>
+  {/if}
+  <p class="sr-only" aria-live="polite">
+    {#if atEnd}
+      Finished: {model.name}.
+    {:else}
+      Step {stepIdx + 1} of {n}. {plans[stepIdx].step.alt}
+    {/if}
+  </p>
+</section>
+
+<footer>
+  {#if phase === 'scrub' && k === 0 && pos <= T_SHOW + 0.02}
+    <button class="hint" onclick={() => go(1)} aria-label="Scroll to fold">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9 L12 15 L18 9" /></svg>
+    </button>
+  {/if}
+
+  {#if atEnd}
     <div class="finale">
       <button class="pill" class:on={done} onclick={toggleDone} aria-pressed={done}>
         <Icon name="stamp" />
@@ -133,51 +215,65 @@
         </a>
       {/if}
     </div>
+  {:else}
+    <div class="step-no" aria-hidden="true">
+      <span class="n">{stepIdx + 1}</span><span class="of">/{n}</span>
+    </div>
   {/if}
 
   <nav class="controls" aria-label="Steps">
-    <div class="buttons">
-    <button class="icon-btn" onclick={() => go(index - 1)} disabled={index === 0} aria-label="Previous step">
+    <button class="icon-btn" onclick={() => go(k - 1)} disabled={k === 0} aria-label="Previous step">
       <Icon name="prev" />
     </button>
-    <button class="icon-btn play" onclick={() => (playing = !playing)} aria-label={playing ? 'Pause' : 'Play'}>
-      <Icon name={playing ? 'pause' : 'play'} />
-    </button>
-    <button class="icon-btn" onclick={() => go(index + 1)} disabled={last} aria-label="Next step">
-      <Icon name="next" />
-    </button>
-    </div>
-
     <ol class="dots">
       {#each plans as p, i}
         <li>
           <button
-            class:on={i === index}
-            class:past={i < index}
+            class:on={i === stepIdx}
+            class:past={i < stepIdx || atEnd}
             onclick={() => go(i)}
             aria-label="Step {i + 1}"
-            aria-current={i === index ? 'step' : undefined}
+            aria-current={i === stepIdx ? 'step' : undefined}
             title={p.step.alt}
           ></button>
         </li>
       {/each}
     </ol>
+    <button class="icon-btn" onclick={() => go(k + 1)} disabled={k >= snaps.length - 1} aria-label="Next step">
+      <Icon name="next" />
+    </button>
   </nav>
-</div>
+</footer>
 
 <style>
-  .screen {
-    min-height: 100dvh;
-    display: grid;
-    grid-template-rows: auto 1fr auto auto auto;
-    max-width: 880px;
-    margin: 0 auto;
-    padding: 10px 16px 14px;
+  :global(html.snap) {
+    scroll-snap-type: y mandatory;
   }
+  .track {
+    position: relative;
+    width: 1px;
+  }
+  .snap-pt {
+    position: absolute;
+    left: 0;
+    width: 1px;
+    height: 1px;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+  }
+
   header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 3;
     display: flex;
     align-items: center;
     gap: 6px;
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 10px 16px;
   }
   .title {
     flex: 1;
@@ -201,23 +297,19 @@
     stroke-width: 2.4;
   }
 
-  .stage-wrap {
-    position: relative;
-    display: grid;
-    place-items: center;
-    min-height: 0;
-    touch-action: pan-y;
-    user-select: none;
-  }
   .stage-box {
-    position: relative;
-    width: min(100%, 62dvh, 620px);
+    position: fixed;
+    z-index: 1;
+    left: 50%;
+    top: calc(68px + (100dvh - 68px - 170px) / 2);
+    transform: translate(-50%, -50%);
+    width: min(calc(100vw - 32px), calc(100dvh - 250px), 620px);
     aspect-ratio: 1;
   }
   .done-stamp {
     position: absolute;
-    right: 2%;
-    top: 2%;
+    right: 0;
+    top: 0;
     animation: thunk 0.35s cubic-bezier(0.3, 1.6, 0.5, 1);
   }
   @keyframes thunk {
@@ -227,11 +319,52 @@
     }
   }
 
+  footer {
+    position: fixed;
+    z-index: 2;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: grid;
+    justify-items: center;
+    gap: 4px;
+    padding: 0 16px 14px;
+    pointer-events: none;
+  }
+  footer > * {
+    pointer-events: auto;
+  }
+
+  .hint {
+    position: absolute;
+    bottom: 170px;
+    width: 48px;
+    height: 48px;
+    display: grid;
+    place-items: center;
+    animation: nudge 1.6s ease-in-out infinite;
+  }
+  .hint svg {
+    width: 34px;
+    height: 34px;
+    fill: none;
+    stroke: var(--blue);
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  @keyframes nudge {
+    50% {
+      transform: translateY(8px);
+      opacity: 0.6;
+    }
+  }
+
   .step-no {
-    text-align: center;
     font-family: var(--font-hand);
     color: var(--ink-soft);
     line-height: 1;
+    min-height: 46px;
   }
   .step-no .n {
     font-size: 44px;
@@ -247,7 +380,14 @@
     justify-content: center;
     gap: 10px;
     flex-wrap: wrap;
-    padding: 8px 0 2px;
+    min-height: 46px;
+    animation: rise 0.35s ease-out;
+  }
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
   }
   .pill {
     display: inline-flex;
@@ -277,7 +417,7 @@
     color: #fff;
   }
   .pill.ghost {
-    background: transparent;
+    background: var(--bg);
     color: var(--ink);
     border: 2px dashed var(--kraft);
     padding-left: 16px;
@@ -287,20 +427,7 @@
   .controls {
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 4px;
-    padding-top: 8px;
-    flex-wrap: wrap;
-  }
-  .buttons {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-  }
-  .controls .play {
-    width: 54px;
-    height: 54px;
-    background: var(--card);
+    gap: 2px;
   }
   .controls button:disabled {
     opacity: 0.3;
@@ -309,14 +436,14 @@
   .dots {
     list-style: none;
     display: flex;
-    gap: 0;
-    margin: 0 0 0 10px;
+    margin: 0;
     padding: 0;
     flex-wrap: wrap;
     justify-content: center;
+    max-width: calc(100vw - 120px);
   }
   .dots button {
-    width: 22px;
+    width: 20px;
     height: 34px;
     display: grid;
     place-items: center;
@@ -341,15 +468,14 @@
   }
 
   @media (max-width: 560px) {
-    .controls {
-      flex-direction: column;
-      gap: 2px;
-    }
-    .dots {
-      margin: 0;
-    }
     h1 {
       font-size: 32px;
+    }
+    .title :global(.level) {
+      display: none;
+    }
+    .dots button {
+      width: 17px;
     }
   }
 </style>

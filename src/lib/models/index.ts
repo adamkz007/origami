@@ -1,6 +1,8 @@
 import type { Face, Model, Pt } from '$lib/fold/engine';
 
+/** side 0 = green (front), side 1 = white (back) */
 const face = (pts: Pt[], side: 0 | 1, ...tags: string[]): Face => ({ pts, side, tags });
+const toned = (f: Face, shade: number): Face => ({ ...f, shade });
 
 /* ---------------- Fish · level 1 ---------------- */
 // Square on its corner: T(0,-100) R(100,0) B(0,100) L(-100,0)
@@ -9,7 +11,7 @@ const fish: Model = {
   name: 'Fish',
   level: 1,
   minutes: 3,
-  start: [face([[0, -100], [100, 0], [0, 100], [-100, 0]], 0, 'sheet')],
+  start: [face([[0, -100], [100, 0], [0, 100], [-100, 0]], 1, 'sheet')],
   steps: [
     {
       op: 'fold',
@@ -39,7 +41,7 @@ const boat: Model = {
   name: 'Boat',
   level: 2,
   minutes: 6,
-  start: [face([[-70, -99], [70, -99], [70, 99], [-70, 99]], 0, 'sheet')],
+  start: [face([[-70, -99], [70, -99], [70, 99], [-70, 99]], 1, 'sheet')],
   steps: [
     {
       op: 'fold',
@@ -75,10 +77,10 @@ const boat: Model = {
       op: 'reshape',
       axis: [[-70, 40], [70, 40]],
       to: [
-        face([[0, -20], [-70, 50], [0, 120], [70, 50]], 1, 'dB'),
-        face([[0, -20], [-70, 50], [0, 120]], 1, 'dF'),
-        face([[0, -20], [0, 120], [70, 50]], 1, 'dF'),
-        face([[0, 120], [-24, 96], [24, 96]], 0, 'dF')
+        face([[0, -20], [-70, 50], [0, 120], [70, 50]], 0, 'dB'),
+        face([[0, -20], [-70, 50], [0, 120]], 0, 'dF'),
+        toned(face([[0, -20], [0, 120], [70, 50]], 0, 'dF'), 0.12),
+        face([[0, 120], [-24, 96], [24, 96]], 1, 'dF')
       ],
       alt: 'Open the hat from the bottom and flatten it into a diamond.'
     },
@@ -96,7 +98,7 @@ const boat: Model = {
       to: [
         face([[0, -20], [-50, 30], [0, 80], [50, 30]], 0, 'eB'),
         face([[0, -20], [-50, 30], [0, 80]], 0, 'eF'),
-        face([[0, -20], [0, 80], [50, 30]], 1, 'eF')
+        toned(face([[0, -20], [0, 80], [50, 30]], 0, 'eF'), 0.12)
       ],
       alt: 'Open it from the bottom again and flatten it into a smaller diamond.'
     },
@@ -105,10 +107,10 @@ const boat: Model = {
       axis: [[-75, 30], [75, 30]],
       to: [
         face([[0, -48], [-40, 30], [0, 30]], 0, 'sail'),
-        face([[0, -48], [0, 30], [40, 30]], 1, 'sail'),
-        face([[-80, 30], [80, 30], [50, 62], [-50, 62]], 1, 'hull'),
-        face([[-80, 30], [-50, 62], [-58, 30]], 0, 'hull'),
-        face([[80, 30], [50, 62], [58, 30]], 0, 'hull')
+        toned(face([[0, -48], [0, 30], [40, 30]], 0, 'sail'), 0.16),
+        face([[-80, 30], [80, 30], [50, 62], [-50, 62]], 0, 'hull'),
+        toned(face([[-80, 30], [-50, 62], [-58, 30]], 0, 'hull'), 0.22),
+        toned(face([[80, 30], [50, 62], [58, 30]], 0, 'hull'), 0.22)
       ],
       alt: 'Gently pull the two top flaps apart. Your boat is done!'
     }
@@ -207,7 +209,7 @@ const crane: Model = {
     {
       op: 'reshape',
       axis: [[-30, -26], [30, -26]],
-      to: [wing('P', 0), neck, tail, face([[-19, -45.5], [0, -12], [19, -45.5]], 1, 'B'), wing('P2', 0)],
+      to: [wing('P', 0), neck, tail, toned(face([[-19, -45.5], [0, -12], [19, -45.5]], 0, 'B'), 0.2), wing('P2', 0)],
       alt: 'Inside-reverse fold the two lower points up between the layers: one neck, one tail.'
     },
     {
@@ -216,7 +218,7 @@ const crane: Model = {
       out: ['N'],
       to: [
         face([[-14, -38], [-78, -71], [0, -12]], 0, 'N'),
-        face([[-72, -68], [-84, -75], [-96, -56]], 1, 'N')
+        toned(face([[-72, -68], [-84, -75], [-96, -56]], 0, 'N'), 0.25)
       ],
       alt: 'Reverse fold the tip of the neck down to make the head.'
     },
@@ -233,8 +235,8 @@ const crane: Model = {
       axis: [[-40, -38], [40, -38]],
       out: ['P', 'P2', 'B'],
       to: [
-        face([[2, -44], [104, -20], [60, -4], [4, -22]], 1, 'W'),
-        face([[-12, -44], [12, -44], [0, -16]], 1, 'B'),
+        toned(face([[2, -44], [104, -20], [60, -4], [4, -22]], 0, 'W'), 0.22),
+        toned(face([[-12, -44], [12, -44], [0, -16]], 0, 'B'), 0.3),
         face([[-2, -44], [-104, -20], [-60, -4], [-4, -22]], 0, 'W')
       ],
       alt: 'Gently pull the wings apart and puff out the body. Your crane is done!'

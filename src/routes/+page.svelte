@@ -1,31 +1,15 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
   import { models } from '$lib/models';
   import { plan } from '$lib/fold/engine';
   import { prefs } from '$lib/prefs.svelte';
-  import { ui } from '$lib/ui.svelte';
   import Stage from '$lib/components/Stage.svelte';
   import Level from '$lib/components/Level.svelte';
   import Icon from '$lib/components/Icon.svelte';
   import Stamp from '$lib/components/Stamp.svelte';
   import Tools from '$lib/components/Tools.svelte';
 
+  // ordered simple → hard
   const cards = models.map((m) => ({ model: m, plans: plan(m) }));
-
-  // only animate cards that are on screen
-  let visible = $state<Record<string, boolean>>({});
-  let mounted = $state(false);
-
-  function inView(node: HTMLElement, slug: string) {
-    const io = new IntersectionObserver(([e]) => (visible[slug] = e.isIntersecting), {
-      rootMargin: '80px'
-    });
-    io.observe(node);
-    return { destroy: () => io.disconnect() };
-  }
-
-  onMount(() => (mounted = true));
-
   const doneCount = $derived(models.filter((m) => prefs.isDone(m.slug)).length);
 </script>
 
@@ -44,66 +28,40 @@
     </svg>
     <h1>origa<span>.</span>mi</h1>
   </a>
-  <Tools />
+  <div class="right">
+    {#if prefs.loaded && doneCount > 0}
+      <span class="progress" aria-label="{doneCount} of {models.length} folded">
+        <Stamp size={24} />{doneCount}/{models.length}
+      </span>
+    {/if}
+    <Tools />
+  </div>
 </header>
 
 <main>
-  {#if prefs.loaded && doneCount > 0}
-    <p class="progress" aria-label="{doneCount} of {models.length} folded">
-      <Stamp size={26} />
-      {doneCount}/{models.length}
-    </p>
-  {/if}
-
-  <ol class="path">
-    <svg class="trail" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-      <path d="M50 0 C 15 18, 85 32, 50 50 S 15 82, 50 100" vector-effect="non-scaling-stroke" />
-    </svg>
-
+  <ol class="gallery">
     {#each cards as { model, plans }, i (model.slug)}
-      {@const prevLevel = i > 0 ? cards[i - 1].model.level : 0}
-      {#if model.level !== prevLevel}
-        <li class="milestone" aria-hidden="true">
-          <span><Level level={model.level} size={18} /></span>
-        </li>
-      {/if}
-      <li class="stop" class:right={i % 2 === 1}>
-        <a
-          href="/m/{model.slug}"
-          class="card"
-          style="--tilt:{[-1.2, 1, -0.6, 1.3][i % 4]}deg"
-          use:inView={model.slug}
-        >
-          <div class="preview">
-            {#if mounted}
-              <Stage
-                {plans}
-                mode="tour"
-                playing={!!visible[model.slug] && !ui.reducedMotion}
-                finished={ui.reducedMotion}
-                label="{model.name}: {plans.length} steps"
-              />
-            {/if}
+      <li style="--tilt:{[-1.4, 1.1, -0.7, 1.5, -1.1][i % 5]}deg; --delay:{i * 70}ms">
+        <a href="/m/{model.slug}" class="card" aria-label="{model.name}, difficulty {model.level} of 5">
+          <div class="preview" style="view-transition-name: model-{model.slug}">
+            <Stage {plans} mode="finished" label={model.name} />
           </div>
           <div class="meta">
             <h2>{model.name}</h2>
-            <div class="facts">
-              <Level level={model.level} />
-              <span class="fact" aria-label="{plans.length} steps"><Icon name="steps" />{plans.length}</span>
-              <span class="fact" aria-label="{model.minutes} minutes"><Icon name="clock" />{model.minutes}′</span>
-            </div>
+            <Level level={model.level} size={14} />
+          </div>
+          <div class="facts" aria-hidden="true">
+            <span><Icon name="steps" />{plans.length}</span>
+            <span><Icon name="clock" />{model.minutes}′</span>
           </div>
           {#if prefs.isDone(model.slug)}
-            <span class="done" aria-label="completed"><Stamp size={58} /></span>
+            <span class="done" aria-label="completed"><Stamp size={54} /></span>
           {/if}
         </a>
       </li>
     {/each}
-
-    <li class="milestone soon" aria-label="more models coming">
-      <span>
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12 h.01 M12 12 h.01 M19 12 h.01" /></svg>
-      </span>
+    <li class="soon" aria-label="more models coming" style="--tilt:1deg">
+      <div class="blank"></div>
     </li>
   </ol>
 </main>
@@ -113,7 +71,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    max-width: 880px;
+    max-width: 1080px;
     margin: 0 auto;
     padding: 18px 16px 0;
   }
@@ -127,105 +85,68 @@
     height: 46px;
     filter: url(#wobble-ink);
   }
-  .logo .a {
-    fill: var(--paper-a);
+  .logo .a,
+  .logo .b {
     stroke: var(--ink);
     stroke-width: 2.4;
     stroke-linejoin: round;
+  }
+  .logo .a {
+    fill: var(--paper-a);
   }
   .logo .b {
     fill: var(--paper-b);
-    stroke: var(--ink);
-    stroke-width: 2.4;
-    stroke-linejoin: round;
   }
   h1 {
     font-size: 46px;
-    letter-spacing: 0.5px;
   }
   h1 span {
     color: var(--kraft-deep);
   }
-
-  main {
-    max-width: 880px;
-    margin: 0 auto;
-    padding: 8px 16px 80px;
-  }
-
-  .progress {
+  .right {
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 6px;
-    margin: 4px 0 0;
-    font-size: 20px;
-    color: var(--ink-soft);
-  }
-
-  .path {
-    position: relative;
-    list-style: none;
-    margin: 0;
-    padding: 24px 0 0;
-    display: flex;
-    flex-direction: column;
     gap: 8px;
   }
-  .trail {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    z-index: 0;
-  }
-  .trail path {
-    fill: none;
-    stroke: var(--kraft);
-    stroke-width: 2.5;
-    stroke-dasharray: 10 8;
-    stroke-linecap: round;
+  .progress {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--ink-soft);
+    font-size: 19px;
   }
 
-  .milestone {
-    position: relative;
-    z-index: 1;
-    display: flex;
-    justify-content: center;
-    padding: 6px 0;
-  }
-  .milestone span {
-    background: var(--bg);
-    border: 2px solid var(--kraft);
-    border-radius: 999px;
-    padding: 6px 12px 4px;
-  }
-  .soon svg {
-    width: 28px;
-    height: 18px;
-    fill: none;
-    stroke: var(--kraft-deep);
-    stroke-width: 3.5;
-    stroke-linecap: round;
-    display: block;
+  main {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 22px 16px 80px;
   }
 
-  .stop {
-    position: relative;
-    z-index: 1;
-    display: flex;
-    justify-content: flex-start;
+  .gallery {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr));
+    gap: 28px 24px;
   }
-  .stop.right {
-    justify-content: flex-end;
+  .gallery li {
+    animation: drop 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+    animation-delay: var(--delay, 0ms);
+  }
+  @keyframes drop {
+    from {
+      opacity: 0;
+      transform: translateY(18px) rotate(calc(var(--tilt) * 3));
+    }
   }
 
   .card {
     position: relative;
-    width: min(100%, 380px);
+    display: block;
     background: var(--card);
     border-radius: var(--radius);
-    padding: 12px 12px 14px;
+    padding: 10px 10px 12px;
     box-shadow:
       0 1px 0 var(--kraft) inset,
       0 6px 18px var(--shadow);
@@ -233,43 +154,52 @@
     transition:
       transform 0.25s,
       box-shadow 0.25s;
-    display: block;
   }
-  .card:hover {
-    transform: rotate(0deg) translateY(-3px);
-    box-shadow: 0 12px 28px var(--shadow);
+  .card:hover,
+  .card:focus-visible {
+    transform: rotate(0) translateY(-4px);
+    box-shadow: 0 14px 30px var(--shadow);
   }
   .preview {
     aspect-ratio: 1;
     border-radius: 10px;
     background: var(--bg);
-    padding: 6%;
+    padding: 10%;
+    transition: transform 0.4s;
+  }
+  .card:hover .preview :global(.stage) {
+    animation: bob 2.4s ease-in-out infinite;
+  }
+  @keyframes bob {
+    50% {
+      transform: translateY(-4px) rotate(-1.5deg);
+    }
   }
   .meta {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
     gap: 8px;
-    padding: 10px 4px 0;
-    flex-wrap: wrap;
+    padding: 8px 4px 0;
   }
   h2 {
-    font-size: 38px;
+    font-size: 34px;
   }
   .facts {
     display: flex;
-    align-items: center;
     gap: 12px;
+    padding: 0 4px;
     color: var(--ink-soft);
+    font-size: 16px;
   }
-  .fact {
+  .facts span {
     display: inline-flex;
     align-items: center;
     gap: 3px;
   }
-  .fact :global(svg) {
-    width: 18px;
-    height: 18px;
+  .facts :global(svg) {
+    width: 16px;
+    height: 16px;
     fill: none;
     stroke: var(--ink-soft);
     stroke-width: 1.8;
@@ -278,17 +208,47 @@
   }
   .done {
     position: absolute;
-    top: 4px;
-    right: 6px;
+    top: 2px;
+    right: 4px;
+  }
+
+  .soon {
+    transform: rotate(var(--tilt));
+    border: 2px dashed var(--kraft);
+    border-radius: var(--radius);
+    padding: 10px;
+    opacity: 0.7;
+  }
+  .soon .blank {
+    aspect-ratio: 1;
+    margin: 12%;
+    background: var(--paper-b);
+    border: 1.5px solid var(--kraft);
+    transform: rotate(45deg) scale(0.62);
+    box-shadow: 4px 6px 0 var(--shadow);
   }
 
   @media (max-width: 560px) {
-    .stop,
-    .stop.right {
-      justify-content: center;
-    }
     h1 {
       font-size: 40px;
+    }
+    .gallery {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 18px 14px;
+    }
+    h2 {
+      font-size: 26px;
+    }
+    .meta {
+      flex-direction: column;
+      gap: 2px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .gallery li,
+    .card:hover .preview :global(.stage) {
+      animation: none;
     }
   }
 </style>

@@ -21,8 +21,10 @@ Netlify picks up `netlify.toml` (build `npm run build`, publish `build`).
 | `src/lib/components/Stage.svelte` | SVG renderer + timeline + gliding camera. |
 | `src/lib/models/index.ts` | Model data (fish ◸, boat ◸◸, crane ◸◸◸◸). |
 | `src/lib/prefs.svelte.ts` | "Mark completed" + sound setting, stored in `localStorage`. |
-| `src/routes/+page.svelte` | Home: the simple → hard path. |
-| `src/routes/m/[slug]` | Step player. |
+| `src/routes/+page.svelte` | Home: gallery of finished models, simple → hard. |
+| `src/routes/m/[slug]` | Guide: opens finished, unfolds to a blank sheet, then scroll folds one step at a time. |
+
+Paper: side 0 = green (front), side 1 = white (back). Authored faces can take `shade` (0–1) for a static tone.
 
 ## Authoring a step
 

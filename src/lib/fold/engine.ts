@@ -17,6 +17,8 @@ export interface Face {
   pts: Pt[];
   side: Side;
   tags: string[];
+  /** static tone 0..1, for authored faces that sit at an angle */
+  shade?: number;
 }
 
 export interface Mark {
@@ -159,6 +161,7 @@ export interface Piece {
   pts: Pt[];
   side: Side;
   tags: string[];
+  shade?: number;
   /** index into plan.lines; -1 = static */
   motion: number;
   behind?: boolean;
@@ -179,7 +182,7 @@ export interface Plan {
 }
 
 function cloneFace(f: Face): Face {
-  return { pts: f.pts.map((p) => [p[0], p[1]] as Pt), side: f.side, tags: [...f.tags] };
+  return { pts: f.pts.map((p) => [p[0], p[1]] as Pt), side: f.side, tags: [...f.tags], shade: f.shade };
 }
 
 function planFold(state: PaperState, step: Extract<Step, { op: 'fold' }>): Plan {
@@ -220,6 +223,7 @@ function planFold(state: PaperState, step: Extract<Step, { op: 'fold' }>): Plan 
         next.push({
           pts: mv,
           side: pc.side,
+          shade: pc.shade,
           tags: spec.tag ? [...pc.tags, spec.tag] : [...pc.tags],
           motion: li,
           behind: spec.behind
@@ -258,7 +262,8 @@ function planFold(state: PaperState, step: Extract<Step, { op: 'fold' }>): Plan 
     const flipped = mv.reverse().map((p) => ({
       pts: p.pts.map((q) => reflect(L, q)).reverse(),
       side: (1 - p.side) as Side,
-      tags: p.tags
+      tags: p.tags,
+      shade: p.shade
     }));
     if (step.folds[li].behind) back.unshift(...flipped);
     else front.push(...flipped);
@@ -321,7 +326,8 @@ function planSimple(state: PaperState, step: Step): Plan {
       faces: [...state.faces].reverse().map((f) => ({
         pts: f.pts.map((p) => [2 * c[0] - p[0], p[1]] as Pt).reverse(),
         side: (1 - f.side) as Side,
-        tags: [...f.tags]
+        tags: [...f.tags],
+        shade: f.shade
       })),
       marks: []
     };

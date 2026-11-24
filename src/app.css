@@ -6,9 +6,12 @@
   --ink: #4e3b2c;
   --ink-soft: #7a6450;
   --paper-a: #a3b899; /* faded green */
-  --paper-b: #9db4c6; /* faded blue */
+  --paper-b: #fbf8f1; /* white back of the paper */
+  --blue: #9db4c6; /* faded blue accent */
+  --paper-edge: #4e3b2c;
+  --halo: rgba(242, 234, 220, 0.55);
   --shadow: rgba(78, 59, 44, 0.16);
-  --stamp: #6f8f68;
+  --stamp: #6f8fa8;
   --font-hand: 'Caveat', 'Segoe Print', 'Bradley Hand', cursive;
   --font-ui: 'Patrick Hand', 'Comic Sans MS', 'Segoe Print', cursive;
   --radius: 14px;
@@ -24,9 +27,12 @@
     --ink: #efe3cf;
     --ink-soft: #c2b39c;
     --paper-a: #8ea585;
-    --paper-b: #879fb2;
+    --paper-b: #e4dccd;
+    --blue: #879fb2;
+    --paper-edge: #2e251d;
+    --halo: rgba(239, 227, 207, 0.7);
     --shadow: rgba(0, 0, 0, 0.35);
-    --stamp: #a3b899;
+    --stamp: #9db4c6;
     color-scheme: dark;
   }
 }
@@ -38,9 +44,12 @@
   --ink: #efe3cf;
   --ink-soft: #c2b39c;
   --paper-a: #8ea585;
-  --paper-b: #879fb2;
+  --paper-b: #e4dccd;
+  --blue: #879fb2;
+  --paper-edge: #2e251d;
+  --halo: rgba(239, 227, 207, 0.7);
   --shadow: rgba(0, 0, 0, 0.35);
-  --stamp: #a3b899;
+  --stamp: #9db4c6;
   color-scheme: dark;
 }
 

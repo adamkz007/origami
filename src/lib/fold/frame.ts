@@ -164,12 +164,12 @@ export function frameAt(plan: Plan, u: number, withOverlay = true): Frame {
     });
     for (const pc of plan.pieces) {
       if (pc.motion < 0) {
-        stat.push({ pts: pc.pts, side: pc.side, shade: 0 });
+        stat.push({ pts: pc.pts, side: pc.side, shade: pc.shade ?? 0 });
         continue;
       }
       const L = plan.lines[pc.motion];
       const pts = pc.pts.map((q) => sub(q, mul(L.n, sdist(L, q) * (1 - c))));
-      const dp: DrawPoly = { pts, side: (c >= 0 ? pc.side : 1 - pc.side) as Side, shade };
+      const dp: DrawPoly = { pts, side: (c >= 0 ? pc.side : 1 - pc.side) as Side, shade: Math.min(1, shade + (pc.shade ?? 0)) };
       (pc.behind ? back : front)[pc.motion].push(dp);
     }
     const ordered = (g: DrawPoly[]) => (c >= 0 ? g : [...g].reverse());
@@ -178,7 +178,7 @@ export function frameAt(plan: Plan, u: number, withOverlay = true): Frame {
     const L = plan.lines[0];
     for (const pc of plan.pieces) {
       if (pc.motion < 0) {
-        polys.push({ pts: pc.pts, side: pc.side, shade: 0 });
+        polys.push({ pts: pc.pts, side: pc.side, shade: pc.shade ?? 0 });
         continue;
       }
       const goingOut = pc.phase === 'out';
@@ -186,7 +186,7 @@ export function frameAt(plan: Plan, u: number, withOverlay = true): Frame {
       if (!goingOut && t < 0.5) continue;
       const k = goingOut ? Math.cos(Math.PI * t) : -Math.cos(Math.PI * t);
       const pts = pc.pts.map((q) => sub(q, mul(L.n, sdist(L, q) * (1 - k))));
-      polys.push({ pts, side: pc.side, shade: (1 - k) * (t > 0 && t < 1 ? 1 : 0) });
+      polys.push({ pts, side: pc.side, shade: Math.min(1, (1 - k) * (t > 0 && t < 1 ? 1 : 0) + (pc.shade ?? 0)) });
     }
   } else if (s.op === 'flip') {
     const cx = center(plan.before)[0];
@@ -196,7 +196,7 @@ export function frameAt(plan: Plan, u: number, withOverlay = true): Frame {
       polys.push({
         pts: pc.pts.map((q) => [cx + (q[0] - cx) * c, q[1]] as Pt),
         side: (c >= 0 ? pc.side : 1 - pc.side) as Side,
-        shade: (1 - Math.abs(c)) * 0.8
+        shade: Math.min(1, (1 - Math.abs(c)) * 0.8 + (pc.shade ?? 0))
       });
     }
     marks = c >= 0 ? marks.map((m) => ({ ...m, at: [cx + (m.at[0] - cx) * c, m.at[1]] as Pt })) : [];
@@ -204,11 +204,11 @@ export function frameAt(plan: Plan, u: number, withOverlay = true): Frame {
     const c = center(plan.before);
     const r = ((s.deg * Math.PI) / 180) * t;
     for (const pc of plan.pieces) {
-      polys.push({ pts: pc.pts.map((q) => rotatePt(q, c, r)), side: pc.side, shade: 0 });
+      polys.push({ pts: pc.pts.map((q) => rotatePt(q, c, r)), side: pc.side, shade: pc.shade ?? 0 });
     }
     marks = marks.map((m) => ({ ...m, at: rotatePt(m.at, c, r) }));
   } else if (s.op === 'mark') {
-    for (const pc of plan.pieces) polys.push({ pts: pc.pts, side: pc.side, shade: 0 });
+    for (const pc of plan.pieces) polys.push({ pts: pc.pts, side: pc.side, shade: pc.shade ?? 0 });
     // pop in with a little overshoot
     const pop = t <= 0 ? 0 : t >= 1 ? 1 : Math.sin(t * Math.PI * 0.75) / Math.sin(Math.PI * 0.75);
     marks = [...marks, ...marksAt(s.marks, pop)];
@@ -224,7 +224,7 @@ export function frameAt(plan: Plan, u: number, withOverlay = true): Frame {
 /** Rest frame: the finished state of `plan`, no overlay. */
 export function restFrame(plan: Plan): Frame {
   return {
-    polys: plan.after.faces.map((f) => ({ pts: f.pts, side: f.side, shade: 0 })),
+    polys: plan.after.faces.map((f) => ({ pts: f.pts, side: f.side, shade: f.shade ?? 0 })),
     marks: marksAt(plan.after.marks),
     overlay: { creases: [], arrows: [], draw: 0, alpha: 0 }
   };

@@ -1,12 +1,25 @@
 <script lang="ts">
   import '../app.css';
   import { onMount } from 'svelte';
+  import { onNavigate } from '$app/navigation';
+  import { page } from '$app/state';
   import { prefs } from '$lib/prefs.svelte';
   import { toast } from '$lib/toast.svelte';
   import { ui } from '$lib/ui.svelte';
   import NotationKey from '$lib/components/NotationKey.svelte';
 
   let { children } = $props();
+  // gallery card ⇄ guide stage morph (View Transitions API, where supported)
+  onNavigate((navigation) => {
+    if (!document.startViewTransition || ui.reducedMotion) return;
+    return new Promise((resolve) => {
+      document.startViewTransition(async () => {
+        resolve();
+        await navigation.complete;
+      });
+    });
+  });
+
   onMount(() => {
     prefs.load();
     ui.watchMotion();
@@ -31,13 +44,19 @@
   </defs>
 </svg>
 
-{@render children()}
+{#key page.url.pathname}
+  {@render children()}
+{/key}
 
 <NotationKey bind:open={ui.keyOpen} />
 
 <div class="toast" class:show={!!toast.msg} role="status" aria-live="polite">{toast.msg}</div>
 
 <style>
+  :global(::view-transition-group(*)) {
+    animation-duration: 0.45s;
+    animation-timing-function: cubic-bezier(0.3, 0.9, 0.3, 1);
+  }
   .toast {
     position: fixed;
     left: 50%;
