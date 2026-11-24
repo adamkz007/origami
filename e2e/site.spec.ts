@@ -41,6 +41,23 @@ test.describe('gallery', () => {
 });
 
 test.describe('guide', () => {
+  test('one step folds at folding pace, not scroll pace', async ({ page }) => {
+    await page.goto('/m/fish');
+    await expect(page.locator('.hint')).toBeVisible({ timeout: 15_000 });
+    const paper = () => page.locator('.stage-box .paper').innerHTML();
+    await page.getByRole('button', { name: 'Next step' }).click();
+    await page.waitForTimeout(700); // the page scroll has landed by now
+    const a = await paper();
+    await page.waitForTimeout(600);
+    const b = await paper();
+    expect(b).not.toBe(a); // …but the paper is still folding
+    await page.waitForTimeout(2500);
+    const c = await paper();
+    await page.waitForTimeout(500);
+    expect(await paper()).toBe(c); // and then it comes to rest
+    expect(await stepNo(page)).toBe('2');
+  });
+
   test('opens finished, unfolds to a blank sheet, then shows the first fold', async ({ page }) => {
     await page.goto('/m/fish');
     // the intro rewinds every fold, then draws the first fold's diagram
@@ -78,8 +95,9 @@ test.describe('guide', () => {
     await page.goto('/m/penguin');
     await expect(page.locator('.hint')).toBeVisible({ timeout: 15_000 });
     await page.keyboard.press('End');
-    await expect(page.getByRole('button', { name: 'Mark completed' }).last()).toBeVisible();
-    await page.getByRole('button', { name: 'Mark completed' }).last().click();
+    // the paper folds through the remaining steps at folding pace, then the finish appears
+    await expect(page.locator('.finale')).toBeVisible({ timeout: 15_000 });
+    await page.locator('.finale').getByRole('button', { name: 'Mark completed' }).click();
     await expect(page.locator('.finale .pill.on')).toHaveText(/Completed/);
     expect(await page.evaluate(() => localStorage.getItem('origami.completed'))).toContain('penguin');
     await page.getByRole('link', { name: 'All models' }).click();
@@ -107,7 +125,7 @@ test.describe('guide', () => {
     await page.goto('/m/fish');
     await expect(page.locator('.hint')).toBeVisible({ timeout: 15_000 });
     await page.keyboard.press('End');
-    await page.getByRole('link', { name: 'Next model: Boat' }).click();
+    await page.getByRole('link', { name: 'Next model: Boat' }).click({ timeout: 15_000 });
     await expect(page).toHaveURL(/\/m\/boat$/);
     await expect(page.locator('h1')).toHaveText('Boat');
   });

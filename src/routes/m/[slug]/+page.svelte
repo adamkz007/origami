@@ -38,12 +38,45 @@
   // intro: finished → rewind to blank → draw the first fold lines
   let phase = $state<'finished' | 'rewind' | 'scrub'>('finished');
   let introCap = $state(Infinity);
-  const pos = $derived(Math.min(scrollPos, introCap));
+  const target = $derived(Math.min(scrollPos, introCap));
+  /**
+   * The paper follows the scroll target at folding pace rather than scroll
+   * pace: about 2.4 s per step, faster only for long jumps (dots, End key),
+   * easing in as it arrives.
+   */
+  const STEP_SECONDS = 2.4;
+  let pos = $state(0);
+  let following = false;
+  $effect(() => {
+    if (phase !== 'scrub' || following) return;
+    following = true;
+    let prev = performance.now();
+    let raf = 0;
+    const tick = (now: number) => {
+      const dt = Math.min(0.064, (now - prev) / 1000);
+      prev = now;
+      const diff = target - pos;
+      if (Math.abs(diff) < 1e-4 || ui.reducedMotion) pos = target;
+      else {
+        const speed = Math.max(1 / STEP_SECONDS, Math.abs(diff) / 3); // steps per second
+        const ease = Math.min(1, Math.abs(diff) / 0.15); // slow down over the last bit
+        const step = Math.min(Math.abs(diff), speed * Math.max(0.25, ease) * dt);
+        pos += Math.sign(diff) * step;
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(raf);
+      following = false;
+    };
+  });
 
   const k = $derived.by(() => {
     let best = 0;
     snaps.forEach((s, i) => {
-      if (Math.abs(s - pos) < Math.abs(snaps[best] - pos)) best = i;
+      // controls follow the scroll target, so quick repeated scrolls each count
+      if (Math.abs(s - target) < Math.abs(snaps[best] - target)) best = i;
     });
     return best;
   });
@@ -54,6 +87,7 @@
     phase = 'scrub';
     if (!drawIn) {
       introCap = Infinity;
+      pos = Math.max(0, Math.min(n, T_SHOW + window.scrollY / stepPx));
       return;
     }
     introCap = 0;
